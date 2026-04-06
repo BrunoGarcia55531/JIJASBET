@@ -1,28 +1,41 @@
-# Build stage para frontend React
-FROM node:18-alpine AS client-build
-WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm install
-COPY client/ ./
-RUN npm run build
+# -----------------------
+# 1. BUILD FRONTEND
+# -----------------------
+FROM node:18 AS frontend-build
 
-# Stage final: Node.js backend + React frontend
-FROM node:18-alpine
 WORKDIR /app
 
-# Instalar dependencias del backend
+# Copiamos solo package.json primero (cache)
+COPY client/package*.json ./client/
+
+WORKDIR /app/client
+RUN npm install
+
+# Copiamos el resto del frontend
+COPY client/ .
+
+# Build React
+RUN npm run build
+
+
+# -----------------------
+# 2. BACKEND
+# -----------------------
+FROM node:18
+
+WORKDIR /app
+
+# Copiar package.json del backend
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm install --omit=dev
 
 # Copiar backend
-COPY api/ ./api/
-COPY scripts/ ./scripts/
+COPY . .
 
-# Copiar frontend compilado
-COPY --from=client-build /app/client/build ./client/build
+# Copiar build del frontend al backend
+COPY --from=frontend-build /app/client/build ./client/build
 
-# Exponer puerto
-EXPOSE 5000
+# Puerto (ajústalo si usas otro)
+EXPOSE 3000
 
-# Comando para iniciar
-CMD ["node", "api/server.js"]
+CMD ["npm", "start"]
